@@ -1,0 +1,71 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Simple VPC Template which
+  includes VPC, Internet Gateway
+
+Parameters:
+  VpcCidr:
+    Type: String
+    Default: 10.0.0.0/16
+    AllowedPattern: ^([0-9]{1,3}\.){3}[0-9]{1,3}\/(1[6-9]|2[0-8])$
+    ConstraintDescription: >
+      Must be a valid Cidr between /16 to /28
+  Environment:
+    Type: String
+    AllowedValues:
+      - "prod"
+      - "dev"
+    Default: "dev"
+    Description: >
+      "VPC can be created only in dev and prod Environment"
+
+Metadata:
+  AWS::CloudFormation::Interface
+    ParameterGroups:
+      - Label:
+          default: Network Configuration
+        Parameters:
+          - VpcCidr
+      - Label:
+          default: Environment Settings
+        Parameters:
+          - Environment
+
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsSupport: true
+      EnableHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${Environment}-vpc
+        - Key: Environment
+          Value: !Ref Environment
+
+# Internet Gateway for Internet access
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${Environment}-igw
+
+# Attach Internet Gateway to the VPC
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+Outputs:
+  VpcId:
+    Description: VPC ID
+    Value: !Ref VPC
+    Export:
+      Name: !Sub ${Environment}-VpcId
+  VpcCidrInfo:
+    Value: !GetAtt VPC.CidrBlock
+    Description: CIDR Block of the VPC
+
