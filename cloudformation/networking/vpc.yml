@@ -17,10 +17,10 @@ Parameters:
       - "dev"
     Default: "dev"
     Description: >
-      "VPC can be created only in dev and prod Environment"
+      VPC can be created only in dev and prod Environment
 
 Metadata:
-  AWS::CloudFormation::Interface
+  AWS::CloudFormation::Interface:
     ParameterGroups:
       - Label:
           default: Network Configuration
@@ -37,10 +37,10 @@ Resources:
     Properties:
       CidrBlock: !Ref VpcCidr
       EnableDnsSupport: true
-      EnableHostnames: true
+      EnableDnsHostnames: true
       Tags:
         - Key: Name
-          Value: !Sub ${Environment}-vpc
+          Value: !Sub "${Environment}-vpc"
         - Key: Environment
           Value: !Ref Environment
 
@@ -50,7 +50,7 @@ Resources:
     Properties:
       Tags:
         - Key: Name
-          Value: !Sub ${Environment}-igw
+          Value: !Sub "${Environment}-igw"
 
 # Attach Internet Gateway to the VPC
   InternetGatewayAttachment:
@@ -64,7 +64,7 @@ Outputs:
     Description: VPC ID
     Value: !Ref VPC
     Export:
-      Name: !Sub ${Environment}-VpcId
+      Name: !Sub "${Environment}-VpcId"
   VpcCidrInfo:
     Value: !GetAtt VPC.CidrBlock
     Description: CIDR Block of the VPC
