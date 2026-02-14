@@ -108,13 +108,6 @@ Resources:
       RouteTableId: !Ref PublicRouteTable
       GatewayId: !Ref InternetGateway
       DestinationCidrBlock: 0.0.0.0/0
-      Tags:
-        - Key: Name
-          Value: !Sub "${Environment}-public-route"
-        - Key: Environment
-          Value: !Sub ${Environment}
-        - Key: Owner
-          Value: Platform Team
 # Subnet Association
   PublicSubnetAAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
