@@ -59,6 +59,74 @@ Resources:
       VpcId: !Ref VPC
       InternetGatewayId: !Ref InternetGateway
 
+# Create Public Subnets
+  PublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.1.0/24
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: public-subnet
+        - Key: Environment
+          Value: !Sub ${Environment}
+        - Key: Owner
+          Value: Platform Team
+  PublicSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.2.0/24
+      MapPublicIpOnLaunch: true
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      Tags:
+        - Key: Name
+          Value: public-subnet
+        - Key: Environment
+          Value: !Sub ${Environment}
+        - Key: Owner
+          Value: Platform Team
+  # Create Route Table
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${Environment}-public-route-table"
+        - Key: Environment
+          Value: !Sub ${Environment}
+        - Key: Owner
+          Value: Platform Team
+# Create Public Route
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      GatewayId: !Ref InternetGateway
+      DestinationCidrBlock: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub "${Environment}-public-route"
+        - Key: Environment
+          Value: !Sub ${Environment}
+        - Key: Owner
+          Value: Platform Team
+# Subnet Association
+  PublicSubnetAAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetA
+      RouteTableId: !Ref PublicRouteTable
+  PublicSubnetBAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetB
+      RouteTableId: !Ref PublicRouteTable
+
 Outputs:
   VpcId:
     Description: VPC ID
@@ -68,4 +136,13 @@ Outputs:
   VpcCidrInfo:
     Value: !GetAtt VPC.CidrBlock
     Description: CIDR Block of the VPC
-
+  PublicSubnetAId:
+    Description: Public Subnet ID
+    Value: !Ref PublicSubnetA
+    Export:
+      Name: !Sub "${Environment}-PublicSubnetA"
+  PublicSubnetBId:
+    Description: Public SubnetB ID
+    Value: !Ref PublicSubnetB
+    Export:
+      Name: !Sub "${Environment}-PublicSubnetB"
