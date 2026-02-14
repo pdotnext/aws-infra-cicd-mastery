@@ -1,0 +1,43 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Create ec2 instance in the ${environment}
+
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues:
+      - dev
+      - prod
+
+Resources:
+  WebSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      Description: Access to EC2
+      VpcId: !ImportValue
+        Fn::Sub "${Environment}-VpcId"
+      SecurityGroupIngress:
+        - FromPort: 22
+          ToPort: 22
+          IpProtocol: tcp
+          CidrIp: 0.0.0.0/0
+  EC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t3.micro
+      ImageId: !Sub "{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}"
+      IamInstanceProfile: !ImportValue
+        Fn::Sub "${Environment}-ec2-instance-profile"
+      SecurityGroupsIds:
+        - !Ref WebSecurityGroup
+      MetadataOptions:
+        HttpTokens: required
+        HttpEndpoint: enabled
+      Tags:
+        - Key: Name
+          Value: !Sub "${Environment}-ec2"
+        - Key: Environment
+          Value: !Sub "${Environment}"
+        - Key: Owner
+          Value: Platform Team
+      
