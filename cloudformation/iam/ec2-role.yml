@@ -1,0 +1,54 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Create EC2 Role with read
+  only privileges
+  for choice of your environment
+
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues:
+      - dev
+      - prod
+
+Resources:
+  Ec2ReadOnlyRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${Environment}-ec2-readonly-role"
+      Description: Read only role for ec2
+      AssumeRolePolicyDocument: # <-- this is trust policy
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: sts:AssumeRole #<-- What role can do
+            Principal:
+              Service: ec2.amazonaws.com # <-- This service can assume role
+      Tags:
+        - Key: Name
+          Value: !Sub "${Environment}-ec2-readonly-role"
+        - Key: Environment
+          Value: !Sub "${Environment}"
+      Policies: #<-- inline policy
+        - PolicyName: Ec2ReadOnlyPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "ec2:DescribeInstances" # <-- What does this role
+                Resource: "*"
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Sub "${Environment}-ec2-instance-profile"
+      Roles:
+        - !Ref Ec2ReadOnlyRole
+
+Outputs:
+  RoleName:
+    Value: !Ref Ec2ReadOnlyRole
+    Description: EC2 Role Name
+    Export:
+      Name: !Sub "${Environment}-ec2-readonly-role"
+
