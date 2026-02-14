@@ -51,4 +51,8 @@ Outputs:
     Description: EC2 Role Name
     Export:
       Name: !Sub "${Environment}-ec2-readonly-role"
-
+  InstanceProfileName:
+    Description: EC2 Instance Profile Name
+    Value: !Ref InstanceProfile
+    Export:
+      Name: !Sub "${Environment}-ec2-instance-profile"
