@@ -8,14 +8,16 @@ Parameters:
     AllowedValues:
       - dev
       - prod
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
 
 Resources:
   WebSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      Description: Access to EC2
+      GroupDescription: Access to EC2
       VpcId: !ImportValue
-        Fn::Sub "${Environment}-VpcId"
+        'Fn::Sub': "${Environment}-VpcId"
       SecurityGroupIngress:
         - FromPort: 22
           ToPort: 22
@@ -26,13 +28,16 @@ Resources:
     Properties:
       InstanceType: t3.micro
       ImageId: !Sub "{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}"
+      SubnetId: !ImportValue
+        'Fn::Sub': "${Environment}-PublicSubnetA"
       IamInstanceProfile: !ImportValue
-        Fn::Sub "${Environment}-ec2-instance-profile"
-      SecurityGroupsIds:
+        'Fn::Sub': "${Environment}-ec2-instance-profile"
+      SecurityGroupIds:
         - !Ref WebSecurityGroup
       MetadataOptions:
         HttpTokens: required
         HttpEndpoint: enabled
+      KeyName: !Ref KeyName
       Tags:
         - Key: Name
           Value: !Sub "${Environment}-ec2"
@@ -40,4 +45,3 @@ Resources:
           Value: !Sub "${Environment}"
         - Key: Owner
           Value: Platform Team
-      
