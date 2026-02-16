@@ -1,0 +1,78 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  ASG for compute with
+  Launch template, Update Policy
+  Multi-AZ Support and Update Policy
+
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues:
+      - dev
+      - prod
+
+Resources:
+# Security Group for ASG
+  WebSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: ec2 security group
+      VpcId: !ImportValue
+        "Fn::Sub": "${Environment}-VpcId"
+      SecurityGroupIngress:
+        - FromPort: 22
+          ToPort: 22
+          IpProtocol: tcp
+          CidrIp: 0.0.0.0/0 # For lab use only - restrict in production
+
+# EC2 configuration using launch template
+  ComputeLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        ImageId: !Sub "{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}"
+        InstanceType: t3.micro
+        NetworkInterfaces:
+          - DeviceIndex: 0
+            AssociatePublicIpAddress: true
+            Groups:
+              - !Ref WebSecurityGroup
+        MetadataOptions:
+          HttpTokens: required
+          HttpEndpoint: enabled
+        IamInstanceProfile:
+          Name: !ImportValue
+            "Fn::Sub": "${Environment}-ec2-instance-profile"
+        TagSpecifications:
+          - ResourceType: instance
+            Tags:
+              - Key: Name
+                Value: !Sub "${Environment}-ec2"
+# Compute Lifecycle management using ASG
+  ComputeAutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      VPCZoneIdentifier:
+        - !ImportValue
+            "Fn::Sub": "${Environment}-PublicSubnetA"
+        - !ImportValue
+            "Fn::Sub": "${Environment}-PublicSubnetB"
+      DesiredCapacity: 1
+      MinSize: 1
+      MaxSize: 2
+      LaunchTemplate:
+        LaunchTemplateId: !Ref ComputeLaunchTemplate
+        Version: !GetAtt ComputeLaunchTemplate.LatestVersionNumber
+      Tags:
+        - Key: Environment
+          Value: !Sub "${Environment}"
+          PropagateAtLaunch: true
+# Rolling Update Policy for Compute
+    UpdatePolicy:
+      AutoScalingRollingUpdate:
+        MinInstancesInService: 1
+        MaxBatchSize: 1
+        WaitOnResourceSignals: false
+        PauseTime: PT5M
+
+
