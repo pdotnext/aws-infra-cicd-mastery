@@ -17,7 +17,7 @@ Resources:
     Properties:
       GroupDescription: Access to EC2
       VpcId: !ImportValue
-        'Fn::Sub': "${Environment}-VpcId"
+        "Fn::Sub": "${Environment}-VpcId"
       SecurityGroupIngress:
         - FromPort: 22
           ToPort: 22
@@ -29,9 +29,9 @@ Resources:
       InstanceType: t3.micro
       ImageId: !Sub "{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}"
       SubnetId: !ImportValue
-        'Fn::Sub': "${Environment}-PublicSubnetA"
+        "Fn::Sub": "${Environment}-PublicSubnetA"
       IamInstanceProfile: !ImportValue
-        'Fn::Sub': "${Environment}-ec2-instance-profile"
+        "Fn::Sub": "${Environment}-ec2-instance-profile"
       SecurityGroupIds:
         - !Ref WebSecurityGroup
       MetadataOptions:
