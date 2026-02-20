@@ -44,7 +44,7 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
 
-# Internet Gateway for Internet access
+  # Internet Gateway for Internet access
   InternetGateway:
     Type: AWS::EC2::InternetGateway
     Properties:
@@ -52,14 +52,14 @@ Resources:
         - Key: Name
           Value: !Sub "${Environment}-igw"
 
-# Attach Internet Gateway to the VPC
+  # Attach Internet Gateway to the VPC
   InternetGatewayAttachment:
     Type: AWS::EC2::VPCGatewayAttachment
     Properties:
       VpcId: !Ref VPC
       InternetGatewayId: !Ref InternetGateway
 
-# Create Public Subnets
+  # Create Public Subnets
   PublicSubnetA:
     Type: AWS::EC2::Subnet
     Properties:
@@ -100,7 +100,7 @@ Resources:
           Value: !Sub ${Environment}
         - Key: Owner
           Value: Platform Team
-# Create Public Route
+  # Create Public Route
   PublicRoute:
     Type: AWS::EC2::Route
     DependsOn: InternetGatewayAttachment
@@ -108,7 +108,7 @@ Resources:
       RouteTableId: !Ref PublicRouteTable
       GatewayId: !Ref InternetGateway
       DestinationCidrBlock: 0.0.0.0/0
-# Subnet Association
+  # Subnet Association
   PublicSubnetAAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
@@ -119,6 +119,29 @@ Resources:
     Properties:
       SubnetId: !Ref PublicSubnetB
       RouteTableId: !Ref PublicRouteTable
+
+  # Create private subnet for compute
+  PrivateSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      CidrBlock: 10.0.11.0/24
+      MapPublicIpOnLaunch: false
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${Environment}-PrivateSubnetA"
+  # Private Subnet B
+  PrivateSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.12.0/24
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub "${Environment}-PrivateSubnetB"
 
 Outputs:
   VpcId:
