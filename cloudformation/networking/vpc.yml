@@ -31,6 +31,13 @@ Metadata:
         Parameters:
           - Environment
 
+# add condition to check the environment
+Conditions:
+  IsProd:
+    Fn::Equals:
+      - Ref: Environment
+      - "prod"
+
 Resources:
   VPC:
     Type: AWS::EC2::VPC
@@ -79,7 +86,8 @@ Resources:
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: "${Environment}-PublicSubnetA"
+          Value:
+            Fn::Sub: "${Environment}-PublicSubnetA"
         - Key: Environment
           Value:
             Ref: Environment
@@ -98,13 +106,15 @@ Resources:
           - Fn::GetAZs: ""
       Tags:
         - Key: Name
-          Value: "${Environment}-PublicSubnetB"
+          Value:
+            Fn::Sub: "${Environment}-PublicSubnetB"
         - Key: Environment
           Value:
             Ref: Environment
         - Key: Owner
           Value: Platform Team
-  # Create Route Table
+
+  # Create Public Route Table
   PublicRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
@@ -119,6 +129,7 @@ Resources:
             Ref: Environment
         - Key: Owner
           Value: Platform Team
+
   # Create Public Route
   PublicRoute:
     Type: AWS::EC2::Route
@@ -129,7 +140,7 @@ Resources:
       GatewayId:
         Ref: InternetGateway
       DestinationCidrBlock: 0.0.0.0/0
-  # Subnet Association
+  # Public Subnet Association
   PublicSubnetAAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
@@ -146,6 +157,7 @@ Resources:
         Ref: PublicRouteTable
 
   # Create private subnet for compute
+  # Private Subnet A
   PrivateSubnetA:
     Type: AWS::EC2::Subnet
     Properties:
@@ -163,10 +175,9 @@ Resources:
             Fn::Sub: "${Environment}-PrivateSubnetA"
         - Key: Environment
           Value:
-            Fn::Sub: ${Environment}
+            Ref: Environment
         - Key: Owner
           Value: Platform Team
-
   # Private Subnet B
   PrivateSubnetB:
     Type: AWS::EC2::Subnet
@@ -185,10 +196,11 @@ Resources:
             Fn::Sub: "${Environment}-PrivateSubnetB"
         - Key: Environment
           Value:
-            Fn::Sub: ${Environment}
+            Ref: Environment
         - Key: Owner
           Value: Platform Team
-  # Elastic IP for NAT GW
+
+  # Elastic IP for NAT GW A
   NatEipA:
     Type: AWS::EC2::EIP
     DependsOn: InternetGatewayAttachment
@@ -200,7 +212,7 @@ Resources:
             Fn::Sub: "${Environment}-NatEipA"
 
   # NAT Gateway for private subnets in AZ-A
-  NATGatewayA:
+  NatGatewayA:
     Type: AWS::EC2::NatGateway
     DependsOn: InternetGatewayAttachment
     Properties:
@@ -211,7 +223,35 @@ Resources:
       Tags:
         - Key: Name
           Value:
-            Fn::Sub: "${Environment}-NATGatewayA"
+            Fn::Sub: "${Environment}-NatGatewayA"
+
+  # Elastic IP for NAT GW B (For prod only)
+  NatEipB:
+    Type: AWS::EC2::EIP
+    DependsOn: InternetGatewayAttachment
+    Condition: IsProd
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value:
+            Fn::Sub: "${Environment}-NatEipB"
+
+  # NAT Gateway (For prod only)
+  NatGatewayB:
+    Type: AWS::EC2::NatGateway
+    DependsOn: InternetGatewayAttachment
+    Condition: IsProd
+    Properties:
+      SubnetId:
+        Ref: PublicSubnetB
+      AllocationId:
+        Fn::GetAtt: NatEipB.AllocationId
+      Tags:
+        - Key: Name
+          Value:
+            Fn::Sub: "${Environment}-NatGatewayB"
+
   # Private Route table in AZ-A
   PrivateRouteTableA:
     Type: AWS::EC2::RouteTable
@@ -227,15 +267,47 @@ Resources:
           Value: Platform Team
       VpcId:
         Ref: VPC
+
+  # Private Route Table in AZ-B
+  PrivateRouteTableB:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: VPC
+      Tags:
+        - Key: Name
+          Value:
+            Fn::Sub: "${Environment}-PrivateRouteTableB"
+        - Key: Environment
+          Value:
+            Ref: Environment
+        - Key: Owner
+          Value: Platform Team
+
   # Default Private Route default to NatGatewayA
   PrivateRouteA:
     Type: AWS::EC2::Route
-    DependsOn: NATGatewayA
+    DependsOn: NatGatewayA
     Properties:
       NatGatewayId:
-        Ref: NATGatewayA
+        Ref: NatGatewayA
       RouteTableId:
         Ref: PrivateRouteTableA
+      DestinationCidrBlock: 0.0.0.0/0
+
+  # Default Private Route to NatGatewayB (For prod only)
+  # [Note] DependsOn NatGatewayB is not explicitly
+  # mentioned to keep code clear and simple
+  PrivateRouteB:
+    Type: AWS::EC2::Route
+    Properties:
+      NatGatewayId:
+        Fn::If:
+          - IsProd
+          - Ref: NatGatewayB
+          - Ref: NatGatewayA
+      RouteTableId:
+        Ref: PrivateRouteTableB
       DestinationCidrBlock: 0.0.0.0/0
 
   # Private Subnet in AZ-A Association with Nat Gateway AZ-A
@@ -246,6 +318,15 @@ Resources:
         Ref: PrivateRouteTableA
       SubnetId:
         Ref: PrivateSubnetA
+
+  # Private Subnet in AZ-B Association with Nat Gateway AZ-B
+  PrivateSubnetBAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId:
+        Ref: PrivateSubnetB
+      RouteTableId:
+        Ref: PrivateRouteTableB
 
 Outputs:
   VpcId:
