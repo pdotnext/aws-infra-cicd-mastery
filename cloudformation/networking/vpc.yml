@@ -35,14 +35,17 @@ Resources:
   VPC:
     Type: AWS::EC2::VPC
     Properties:
-      CidrBlock: !Ref VpcCidr
+      CidrBlock:
+        Ref: VpcCidr
       EnableDnsSupport: true
       EnableDnsHostnames: true
       Tags:
         - Key: Name
-          Value: !Sub "${Environment}-vpc"
+          Value:
+            Fn::Sub: "${Environment}-vpc"
         - Key: Environment
-          Value: !Ref Environment
+          Value:
+            Ref: Environment
 
   # Internet Gateway for Internet access
   InternetGateway:
@@ -50,54 +53,70 @@ Resources:
     Properties:
       Tags:
         - Key: Name
-          Value: !Sub "${Environment}-igw"
+          Value:
+            Fn::Sub: "${Environment}-igw"
 
   # Attach Internet Gateway to the VPC
   InternetGatewayAttachment:
     Type: AWS::EC2::VPCGatewayAttachment
     Properties:
-      VpcId: !Ref VPC
-      InternetGatewayId: !Ref InternetGateway
+      VpcId:
+        Ref: VPC
+      InternetGatewayId:
+        Ref: InternetGateway
 
   # Create Public Subnets
   PublicSubnetA:
     Type: AWS::EC2::Subnet
     Properties:
-      VpcId: !Ref VPC
+      VpcId:
+        Ref: VPC
       CidrBlock: 10.0.1.0/24
-      AvailabilityZone: !Select [0, !GetAZs ""]
+      AvailabilityZone:
+        Fn::Select:
+          - 0
+          - Fn::GetAZs: ""
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: public-subnet
+          Value: "${Environment}-PublicSubnetA"
         - Key: Environment
-          Value: !Sub ${Environment}
+          Value:
+            Ref: Environment
         - Key: Owner
           Value: Platform Team
   PublicSubnetB:
     Type: AWS::EC2::Subnet
     Properties:
-      VpcId: !Ref VPC
+      VpcId:
+        Ref: VPC
       CidrBlock: 10.0.2.0/24
       MapPublicIpOnLaunch: true
-      AvailabilityZone: !Select [1, !GetAZs ""]
+      AvailabilityZone:
+        Fn::Select:
+          - 1
+          - Fn::GetAZs: ""
       Tags:
         - Key: Name
-          Value: public-subnet
+          Value: "${Environment}-PublicSubnetB"
         - Key: Environment
-          Value: !Sub ${Environment}
+          Value:
+            Ref: Environment
         - Key: Owner
           Value: Platform Team
   # Create Route Table
   PublicRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
-      VpcId: !Ref VPC
+      VpcId:
+        Ref: VPC
       Tags:
         - Key: Name
-          Value: !Sub "${Environment}-public-route-table"
+          Value:
+            Fn::Sub: "${Environment}-public-route-table"
         - Key: Environment
-          Value: !Sub ${Environment}
+          Value:
+            Ref: Environment
         - Key: Owner
           Value: Platform Team
   # Create Public Route
@@ -105,60 +124,166 @@ Resources:
     Type: AWS::EC2::Route
     DependsOn: InternetGatewayAttachment
     Properties:
-      RouteTableId: !Ref PublicRouteTable
-      GatewayId: !Ref InternetGateway
+      RouteTableId:
+        Ref: PublicRouteTable
+      GatewayId:
+        Ref: InternetGateway
       DestinationCidrBlock: 0.0.0.0/0
   # Subnet Association
   PublicSubnetAAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      SubnetId: !Ref PublicSubnetA
-      RouteTableId: !Ref PublicRouteTable
+      SubnetId:
+        Ref: PublicSubnetA
+      RouteTableId:
+        Ref: PublicRouteTable
   PublicSubnetBAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      SubnetId: !Ref PublicSubnetB
-      RouteTableId: !Ref PublicRouteTable
+      SubnetId:
+        Ref: PublicSubnetB
+      RouteTableId:
+        Ref: PublicRouteTable
 
   # Create private subnet for compute
   PrivateSubnetA:
     Type: AWS::EC2::Subnet
     Properties:
-      AvailabilityZone: !Select [0, !GetAZs ""]
+      AvailabilityZone:
+        Fn::Select:
+          - 0
+          - Fn::GetAZs: ""
       CidrBlock: 10.0.11.0/24
       MapPublicIpOnLaunch: false
-      VpcId: !Ref VPC
+      VpcId:
+        Ref: VPC
       Tags:
         - Key: Name
-          Value: !Sub "${Environment}-PrivateSubnetA"
+          Value:
+            Fn::Sub: "${Environment}-PrivateSubnetA"
+        - Key: Environment
+          Value:
+            Fn::Sub: ${Environment}
+        - Key: Owner
+          Value: Platform Team
+
   # Private Subnet B
   PrivateSubnetB:
     Type: AWS::EC2::Subnet
     Properties:
-      AvailabilityZone: !Select [1, !GetAZs ""]
-      VpcId: !Ref VPC
+      AvailabilityZone:
+        Fn::Select:
+          - 1
+          - Fn::GetAZs: ""
+      VpcId:
+        Ref: VPC
       CidrBlock: 10.0.12.0/24
       MapPublicIpOnLaunch: false
       Tags:
         - Key: Name
-          Value: !Sub "${Environment}-PrivateSubnetB"
+          Value:
+            Fn::Sub: "${Environment}-PrivateSubnetB"
+        - Key: Environment
+          Value:
+            Fn::Sub: ${Environment}
+        - Key: Owner
+          Value: Platform Team
+  # Elastic IP for NAT GW
+  NatEipA:
+    Type: AWS::EC2::EIP
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value:
+            Fn::Sub: "${Environment}-NatEipA"
+
+  # NAT Gateway for private subnets in AZ-A
+  NATGatewayA:
+    Type: AWS::EC2::NatGateway
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      SubnetId:
+        Ref: PublicSubnetA
+      AllocationId:
+        Fn::GetAtt: NatEipA.AllocationId
+      Tags:
+        - Key: Name
+          Value:
+            Fn::Sub: "${Environment}-NATGatewayA"
+  # Private Route table in AZ-A
+  PrivateRouteTableA:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value:
+            Fn::Sub: "${Environment}-PrivateRouteTableA"
+        - Key: Environment
+          Value:
+            Ref: Environment
+        - Key: Owner
+          Value: Platform Team
+      VpcId:
+        Ref: VPC
+  # Default Private Route default to NatGatewayA
+  PrivateRouteA:
+    Type: AWS::EC2::Route
+    DependsOn: NATGatewayA
+    Properties:
+      NatGatewayId:
+        Ref: NATGatewayA
+      RouteTableId:
+        Ref: PrivateRouteTableA
+      DestinationCidrBlock: 0.0.0.0/0
+
+  # Private Subnet in AZ-A Association with Nat Gateway AZ-A
+  PrivateSubnetAAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PrivateRouteTableA
+      SubnetId:
+        Ref: PrivateSubnetA
 
 Outputs:
   VpcId:
     Description: VPC ID
-    Value: !Ref VPC
+    Value:
+      Ref: VPC
     Export:
-      Name: !Sub "${Environment}-VpcId"
+      Name:
+        Fn::Sub: "${Environment}-VpcId"
   VpcCidrInfo:
-    Value: !GetAtt VPC.CidrBlock
+    Value:
+      Fn::GetAtt: VPC.CidrBlock
     Description: CIDR Block of the VPC
   PublicSubnetAId:
     Description: Public Subnet ID
-    Value: !Ref PublicSubnetA
+    Value:
+      Ref: PublicSubnetA
     Export:
-      Name: !Sub "${Environment}-PublicSubnetA"
+      Name:
+        Fn::Sub: "${Environment}-PublicSubnetA"
   PublicSubnetBId:
     Description: Public SubnetB ID
-    Value: !Ref PublicSubnetB
+    Value:
+      Ref: PublicSubnetB
     Export:
-      Name: !Sub "${Environment}-PublicSubnetB"
+      Name:
+        Fn::Sub: "${Environment}-PublicSubnetB"
+  PrivateSubnetAId:
+    Description: Private Subnet A ID
+    Value:
+      Ref: PrivateSubnetA
+    Export:
+      Name:
+        Fn::Sub: "${Environment}-PrivateSubnetA"
+  PrivateSubnetBId:
+    Description: Private Subnet B ID
+    Value:
+      Ref: PrivateSubnetB
+    Export:
+      Name:
+        Fn::Sub: "${Environment}-PrivateSubnetB"
